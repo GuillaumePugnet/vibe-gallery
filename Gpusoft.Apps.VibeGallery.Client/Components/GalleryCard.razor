@@ -1,0 +1,31 @@
+@using Gpusoft.Apps.VibeGallery.Client.Models
+
+<a href="/gallery/@Gallery.Id" class="card gallery-card h-100 text-decoration-none">
+    <div class="card-img-top-wrapper">
+        @if (Gallery.ThumbnailMediaId is not null)
+        {
+            <img src="/api/media/@Gallery.ThumbnailMediaId/thumbnail"
+                 alt="@Gallery.Name"
+                 class="card-img-top"
+                 loading="lazy" />
+        }
+        else
+        {
+            <div class="placeholder-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
+                    <path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2h-12zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1h12z"/>
+                </svg>
+            </div>
+        }
+    </div>
+    <div class="card-body">
+        <h5 class="card-title text-truncate">@Gallery.Name</h5>
+        <p class="card-text text-muted small">@Gallery.MediaCount items</p>
+    </div>
+</a>
+
+@code {
+    [Parameter, EditorRequired]
+    public GallerySummary Gallery { get; set; } = default!;
+}

@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+  </Folder>
+  <Project Path="Gpusoft.Apps.VibeGallery.Client/Gpusoft.Apps.VibeGallery.Client.csproj" />
+  <Project Path="Gpusoft.Apps.VibeGallery/Gpusoft.Apps.VibeGallery.csproj" />
+</Solution>

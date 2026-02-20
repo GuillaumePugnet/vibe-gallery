@@ -1,0 +1,64 @@
+@page "/"
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@using Gpusoft.Apps.VibeGallery.Client.Components
+@using Gpusoft.Apps.VibeGallery.Client.Models
+@inject HttpClient Http
+
+<PageTitle>Vibe Gallery</PageTitle>
+
+<h1 class="mb-4">Galleries</h1>
+
+@if (_galleries is null)
+{
+    <div class="row g-4">
+        @for (var i = 0; i < 8; i++)
+        {
+            <div class="col-sm-6 col-md-4 col-lg-3">
+                <div class="card h-100" aria-hidden="true">
+                    <div class="card-img-top placeholder-glow">
+                        <span class="placeholder w-100" style="height: 160px; display: block;"></span>
+                    </div>
+                    <div class="card-body placeholder-glow">
+                        <h5 class="card-title placeholder-glow">
+                            <span class="placeholder col-8"></span>
+                        </h5>
+                        <p class="card-text placeholder-glow">
+                            <span class="placeholder col-4"></span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else if (_galleries.Count == 0)
+{
+    <div class="text-center py-5">
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" class="text-muted mb-3" viewBox="0 0 16 16">
+            <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
+            <path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2h-12zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1h12z"/>
+        </svg>
+        <h4 class="text-muted">No galleries yet</h4>
+        <p class="text-muted">Run a media scan to get started.</p>
+    </div>
+}
+else
+{
+    <div class="row g-4">
+        @foreach (var gallery in _galleries)
+        {
+            <div class="col-sm-6 col-md-4 col-lg-3">
+                <GalleryCard Gallery="gallery" />
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<GallerySummary>? _galleries;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _galleries = await Http.GetFromJsonAsync<List<GallerySummary>>("/api/galleries");
+    }
+}

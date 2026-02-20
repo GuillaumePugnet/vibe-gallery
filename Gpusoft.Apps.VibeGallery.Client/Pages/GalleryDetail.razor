@@ -1,0 +1,266 @@
+@page "/gallery/{Id:long}"
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@using Gpusoft.Apps.VibeGallery.Client.Models
+@inject HttpClient Http
+
+<PageTitle>@(_gallery?.Name ?? "Gallery")</PageTitle>
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Galleries</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@(_gallery?.Name ?? $"Gallery {Id}")</li>
+    </ol>
+</nav>
+
+@if (_gallery is null)
+{
+    <h1 class="mb-2 placeholder-glow"><span class="placeholder col-4"></span></h1>
+    <p class="text-muted placeholder-glow"><span class="placeholder col-2"></span></p>
+    <div class="gallery-grid">
+        @for (var i = 0; i < 12; i++)
+        {
+            <div class="gallery-grid-item placeholder-glow">
+                <span class="placeholder w-100" style="height: 200px; display: block; border-radius: .375rem;"></span>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="d-flex align-items-baseline justify-content-between mb-3 flex-wrap gap-2">
+        <div>
+            <h1 class="mb-1">@_gallery.Name</h1>
+            @if (!string.IsNullOrWhiteSpace(_gallery.Description))
+            {
+                <p class="text-muted mb-0">@_gallery.Description</p>
+            }
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="text-muted small text-nowrap" for="pageSize">Per page:</label>
+            <select id="pageSize" class="form-select form-select-sm" style="width: auto;"
+                    value="@_pageSize" @onchange="OnPageSizeChangedAsync">
+                @foreach (var size in PageSizeOptions)
+                {
+                    <option value="@size">@size</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (_gallery.Items.Count == 0)
+    {
+        <div class="text-center py-5">
+            <h4 class="text-muted">No media in this gallery</h4>
+        </div>
+    }
+    else
+    {
+        <div class="gallery-grid">
+            @for (var i = 0; i < _gallery.Items.Count; i++)
+            {
+                var index = i;
+                var item = _gallery.Items[i];
+                <div class="gallery-grid-item" @onclick="() => OpenFullscreen(index)">
+                    @if (item.Type == "Video")
+                    {
+                        <div class="video-badge">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
+                            </svg>
+                        </div>
+                    }
+                    <img src="/api/media/@item.Id/thumbnail"
+                         alt="Media @item.Id"
+                         loading="lazy" />
+                </div>
+            }
+        </div>
+
+        @if (TotalPages > 1)
+        {
+            <nav aria-label="Gallery pagination" class="mt-4 d-flex justify-content-center">
+                <ul class="pagination">
+                    <li class="page-item @(_page <= 1 ? "disabled" : "")">
+                        <button class="page-link" @onclick="() => GoToPageAsync(_page - 1)" disabled="@(_page <= 1)">&laquo;</button>
+                    </li>
+                    @foreach (var p in VisiblePages)
+                    {
+                        <li class="page-item @(p == _page ? "active" : "")">
+                            <button class="page-link" @onclick="() => GoToPageAsync(p)">@p</button>
+                        </li>
+                    }
+                    <li class="page-item @(_page >= TotalPages ? "disabled" : "")">
+                        <button class="page-link" @onclick="() => GoToPageAsync(_page + 1)" disabled="@(_page >= TotalPages)">&raquo;</button>
+                    </li>
+                </ul>
+            </nav>
+        }
+
+        <p class="text-center text-muted small mt-2">
+            Showing @((_page - 1) * _pageSize + 1)–@Math.Min(_page * _pageSize, _gallery.TotalCount) of @_gallery.TotalCount
+        </p>
+    }
+}
+
+@if (_fullscreenIndex is not null && _gallery is not null)
+{
+    <div class="lightbox-overlay" @onclick="CloseFullscreen" @onkeydown="OnKeyDown" tabindex="0" @ref="_lightboxRef">
+        <button class="lightbox-close" @onclick="CloseFullscreen" aria-label="Close">&times;</button>
+
+        <div class="lightbox-nav lightbox-nav-left"
+             @onclick="PreviousMedia" @onclick:stopPropagation="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/>
+            </svg>
+        </div>
+
+        <div class="lightbox-content" @onclick:stopPropagation="true">
+            @{
+                var current = _gallery.Items[_fullscreenIndex.Value];
+            }
+            @if (current.Type == "Video")
+            {
+                <video src="/api/media/@current.Id/file"
+                       controls autoplay
+                       class="lightbox-media" />
+            }
+            else
+            {
+                <img src="/api/media/@current.Id/file"
+                     alt="Media @current.Id"
+                     class="lightbox-media" />
+            }
+        </div>
+
+        <div class="lightbox-nav lightbox-nav-right"
+             @onclick="NextMedia" @onclick:stopPropagation="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
+            </svg>
+        </div>
+
+        <div class="lightbox-counter" @onclick:stopPropagation="true">
+            @(_fullscreenIndex.Value + 1) / @_gallery.Items.Count
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly int[] PageSizeOptions = [12, 24, 48, 96];
+
+    [Parameter]
+    public long Id { get; set; }
+
+    private GalleryDetailResponse? _gallery;
+    private int _page = 1;
+    private int _pageSize = 24;
+    private int? _fullscreenIndex;
+    private ElementReference _lightboxRef;
+
+    private int TotalPages => _gallery is null or { TotalCount: 0 }
+        ? 1
+        : (int)Math.Ceiling((double)_gallery.TotalCount / _pageSize);
+
+    private IEnumerable<int> VisiblePages
+    {
+        get
+        {
+            const int maxVisible = 7;
+            var total = TotalPages;
+            if (total <= maxVisible)
+            {
+                return Enumerable.Range(1, total);
+            }
+
+            var start = Math.Max(1, _page - maxVisible / 2);
+            var end = start + maxVisible - 1;
+            if (end > total)
+            {
+                end = total;
+                start = end - maxVisible + 1;
+            }
+
+            return Enumerable.Range(start, end - start + 1);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadGalleryAsync();
+    }
+
+    private async Task LoadGalleryAsync()
+    {
+        _gallery = await Http.GetFromJsonAsync<GalleryDetailResponse>(
+            $"/api/galleries/{Id}?page={_page}&pageSize={_pageSize}");
+    }
+
+    private async Task GoToPageAsync(int page)
+    {
+        if (page < 1 || page > TotalPages || page == _page) return;
+        _page = page;
+        _gallery = null;
+        await LoadGalleryAsync();
+    }
+
+    private async Task OnPageSizeChangedAsync(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var newSize) && newSize != _pageSize)
+        {
+            _pageSize = newSize;
+            _page = 1;
+            _gallery = null;
+            await LoadGalleryAsync();
+        }
+    }
+
+    private void OpenFullscreen(int index)
+    {
+        _fullscreenIndex = index;
+    }
+
+    private void CloseFullscreen()
+    {
+        _fullscreenIndex = null;
+    }
+
+    private void PreviousMedia()
+    {
+        if (_fullscreenIndex is > 0)
+        {
+            _fullscreenIndex--;
+        }
+    }
+
+    private void NextMedia()
+    {
+        if (_gallery is not null && _fullscreenIndex < _gallery.Items.Count - 1)
+        {
+            _fullscreenIndex++;
+        }
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "Escape":
+                CloseFullscreen();
+                break;
+            case "ArrowLeft":
+                PreviousMedia();
+                break;
+            case "ArrowRight":
+                NextMedia();
+                break;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_fullscreenIndex is not null)
+        {
+            await _lightboxRef.FocusAsync();
+        }
+    }
+}

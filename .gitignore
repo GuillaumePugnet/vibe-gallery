@@ -1,0 +1,57 @@
+appData/
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.log
+*.tmp
+*.temp
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Development settings that may contain secrets
+appsettings.*.Development.json
+
+# Environment files
+.env
+.env.*
+
+# Keys and certificates
+*.pfx
+*.pem
+*.key
+*.jks
+*.keystore
+
+# Visual Studio
+.vs/
+*.swp
+*.swo
+*~
+
+# Rider
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node.js (if any)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build artifacts
+*.nupkg
+*.snupkg
+publish/
+
+# EF Core
+Data/Migrations/*.Designer.cs
