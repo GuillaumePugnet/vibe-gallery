@@ -65,7 +65,7 @@ public static class MediaEndpoints
             return Results.NotFound();
         }
 
-        var (path, contentType, _) = thumbnailService.GetThumbnailPath(media.Id, media.Gallery?.Path);
+        var (path, contentType, _) = thumbnailService.GetThumbnailPath(media.Id, media.Path);
 
         if (!File.Exists(path))
         {
@@ -91,7 +91,7 @@ public static class MediaEndpoints
             return Results.NotFound();
         }
 
-        thumbnailService.DeleteThumbnail(media.Id, media.Gallery?.Path);
+        thumbnailService.DeleteThumbnail(media.Id, media.Path);
 
         db.Media.Remove(media);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);

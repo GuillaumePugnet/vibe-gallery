@@ -46,17 +46,20 @@ public sealed class MediaScannerService : IMediaScanner
     private readonly IHubContext<ScanHub> _hubContext;
     private readonly MediaScannerOptions _options;
     private readonly ILogger<MediaScannerService> _logger;
+    private readonly ThumbnailService _thumbnailService;
 
     public MediaScannerService(
         IServiceScopeFactory scopeFactory,
         IHubContext<ScanHub> hubContext,
         IOptions<MediaScannerOptions> options,
-        ILogger<MediaScannerService> logger)
+        ILogger<MediaScannerService> logger,
+        ThumbnailService thumbnailService)
     {
         _scopeFactory = scopeFactory;
         _hubContext = hubContext;
         _options = options.Value;
         _logger = logger;
+        _thumbnailService = thumbnailService;
     }
 
     public async Task<ScanResult?> ScanAsync(CancellationToken cancellationToken = default)
@@ -185,13 +188,13 @@ public sealed class MediaScannerService : IMediaScanner
     private (int added, int removed) SyncGalleryMedia(AppDbContext db, Gallery gallery, string galleryDir)
     {
         var fsFiles = Directory.Exists(galleryDir)
-            ? Directory.GetFiles(galleryDir)
+            ? Directory.GetFiles(galleryDir, "*", SearchOption.AllDirectories)
                 .Where(f => _options.AllSupportedExtensions.Contains(System.IO.Path.GetExtension(f)))
                 .ToList()
             : [];
 
         var fsRelativePaths = fsFiles
-            .Select(f => System.IO.Path.Combine(gallery.Path, System.IO.Path.GetFileName(f)))
+            .Select(f => System.IO.Path.Combine(gallery.Path, System.IO.Path.GetRelativePath(galleryDir, f)))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var dbMedia = gallery.Media;
@@ -220,6 +223,10 @@ public sealed class MediaScannerService : IMediaScanner
         // Removed media
         var removedMedia = dbMedia.Where(m => !fsRelativePaths.Contains(m.Path)).ToList();
         db.Media.RemoveRange(removedMedia);
+        foreach (var media in removedMedia)
+        {
+            _thumbnailService.DeleteThumbnail(media.Id, media.Path);
+        }
 
         return (newPaths.Count, removedMedia.Count);
     }

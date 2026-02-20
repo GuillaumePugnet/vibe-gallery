@@ -64,7 +64,7 @@ public sealed class ThumbnailBackgroundService(
         {
             ct.ThrowIfCancellationRequested();
 
-            if (thumbnailService.ThumbnailExists(media.Id, media.Gallery?.Path))
+            if (thumbnailService.ThumbnailExists(media.Id, media.Path))
             {
                 continue;
             }

@@ -130,6 +130,12 @@
     user-select: none;
 }
 
+/* ===== Scroll Sentinel ===== */
+.scroll-sentinel {
+    width: 100%;
+    min-height: 1px;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
     .gallery-grid {

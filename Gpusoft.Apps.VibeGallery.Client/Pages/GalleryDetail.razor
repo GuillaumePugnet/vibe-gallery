@@ -2,6 +2,8 @@
 @rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
 @using Gpusoft.Apps.VibeGallery.Client.Models
 @inject HttpClient Http
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <PageTitle>@(_galleryName ?? "Gallery")</PageTitle>
 
@@ -64,18 +66,16 @@ else
             }
         </div>
 
-        @if (_hasMore)
-        {
-            <div class="d-flex justify-content-center py-4">
-                <button class="btn btn-outline-secondary" @onclick="LoadNextBatchAsync" disabled="@_isLoading">
-                    @if (_isLoading)
-                    {
-                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    }
-                    Load more
-                </button>
-            </div>
-        }
+        <div @ref="_sentinelRef" class="scroll-sentinel">
+            @if (_isLoading)
+            {
+                <div class="d-flex justify-content-center py-4">
+                    <div class="spinner-border text-secondary" role="status">
+                        <span class="visually-hidden">Loading…</span>
+                    </div>
+                </div>
+            }
+        </div>
 
         <p class="text-center text-muted small mt-2">
             @_items.Count of @_totalCount
@@ -141,6 +141,10 @@ else
     private bool _hasMore = true;
     private int? _fullscreenIndex;
     private ElementReference _lightboxRef;
+    private ElementReference _sentinelRef;
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<GalleryDetail>? _dotNetRef;
+    private bool _observerAttached;
 
     protected override async Task OnInitializedAsync()
     {
@@ -149,11 +153,35 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./js/gallery-detail.js");
+            _dotNetRef = DotNetObjectReference.Create(this);
+        }
+
+        if (!_observerAttached && _jsModule is not null && _galleryName is not null && _items.Count > 0)
+        {
+            _observerAttached = true;
+            await _jsModule.InvokeVoidAsync("observeSentinel", _sentinelRef, _dotNetRef);
+        }
 
         if (_fullscreenIndex is not null)
         {
             await _lightboxRef.FocusAsync();
         }
+    }
+
+    /// <summary>
+    /// Called from JS when the scroll sentinel becomes visible.
+    /// </summary>
+    [JSInvokable]
+    public async Task LoadMoreItems()
+    {
+        if (_isLoading || !_hasMore) return;
+
+        await LoadNextBatchAsync();
+        StateHasChanged();
     }
 
     private async Task LoadNextBatchAsync()
@@ -239,4 +267,21 @@ else
         }
     }
 
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule is not null)
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("dispose");
+                await _jsModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // Circuit already disconnected during navigation
+            }
+        }
+
+        _dotNetRef?.Dispose();
+    }
 }

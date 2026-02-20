@@ -47,9 +47,9 @@ public sealed class ThumbnailService
     /// <summary>
     /// Gets the file path for a media thumbnail, or the placeholder path if it doesn't exist.
     /// </summary>
-    public (string Path, string ContentType, bool IsPlaceholder) GetThumbnailPath(long mediaId, string? galleryPath = null)
+    public (string Path, string ContentType, bool IsPlaceholder) GetThumbnailPath(long mediaId, string? mediaPath = null)
     {
-        var dir = BuildThumbnailDirectory(galleryPath);
+        var dir = BuildThumbnailDirectory(mediaPath);
 
         var thumbnailPath = Path.Combine(dir, $"{mediaId}{_fileExtension}");
         if (File.Exists(thumbnailPath))
@@ -76,9 +76,9 @@ public sealed class ThumbnailService
     /// <summary>
     /// Deletes the thumbnail file for a single media item.
     /// </summary>
-    public void DeleteThumbnail(long mediaId, string? galleryPath = null)
+    public void DeleteThumbnail(long mediaId, string? mediaPath = null)
     {
-        var dir = BuildThumbnailDirectory(galleryPath);
+        var dir = BuildThumbnailDirectory(mediaPath);
         foreach (var ext in (ReadOnlySpan<string>)[".avif", ".webp"])
         {
             var path = Path.Combine(dir, $"{mediaId}{ext}");
@@ -108,9 +108,9 @@ public sealed class ThumbnailService
     /// <summary>
     /// Returns true if a thumbnail already exists on disk for the given media.
     /// </summary>
-    public bool ThumbnailExists(long mediaId, string? galleryPath = null)
+    public bool ThumbnailExists(long mediaId, string? mediaPath = null)
     {
-        var dir = BuildThumbnailDirectory(galleryPath);
+        var dir = BuildThumbnailDirectory(mediaPath);
         return File.Exists(Path.Combine(dir, $"{mediaId}.avif"))
             || File.Exists(Path.Combine(dir, $"{mediaId}.webp"));
     }
@@ -136,7 +136,7 @@ public sealed class ThumbnailService
                 return false;
             }
 
-            return ResizeAndSave(original, media.Id, media.Gallery?.Path);
+            return ResizeAndSave(original, media.Id, media.Path);
         }
         catch (Exception ex)
         {
@@ -184,7 +184,7 @@ public sealed class ThumbnailService
                 return false;
             }
 
-            return ResizeAndSave(bitmap, media.Id, media.Gallery?.Path);
+            return ResizeAndSave(bitmap, media.Id, media.Path);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -193,7 +193,7 @@ public sealed class ThumbnailService
         }
     }
 
-    private bool ResizeAndSave(SKBitmap original, long mediaId, string? galleryPath = null)
+    private bool ResizeAndSave(SKBitmap original, long mediaId, string? mediaPath = null)
     {
         var (targetWidth, targetHeight) = CalculateTargetSize(original.Width, original.Height);
 
@@ -215,7 +215,7 @@ public sealed class ThumbnailService
             return false;
         }
 
-        var dir = BuildThumbnailDirectory(galleryPath);
+        var dir = BuildThumbnailDirectory(mediaPath);
         Directory.CreateDirectory(dir);
         var outputPath = Path.Combine(dir, $"{mediaId}{_fileExtension}");
         using var fileStream = File.OpenWrite(outputPath);
@@ -224,10 +224,10 @@ public sealed class ThumbnailService
         return true;
     }
 
-    private string BuildThumbnailDirectory(string? galleryPath) =>
-        string.IsNullOrWhiteSpace(galleryPath)
+    private string BuildThumbnailDirectory(string? mediaPath) =>
+        string.IsNullOrWhiteSpace(mediaPath)
             ? _thumbnailsPath
-            : Path.Combine(_thumbnailsPath, galleryPath);
+            : Path.Combine(_thumbnailsPath, Path.GetDirectoryName(mediaPath) ?? mediaPath);
 
     private void DetectEncodingFormat(SKImage testImage)
     {
