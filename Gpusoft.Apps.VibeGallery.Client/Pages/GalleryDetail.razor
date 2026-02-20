@@ -3,16 +3,16 @@
 @using Gpusoft.Apps.VibeGallery.Client.Models
 @inject HttpClient Http
 
-<PageTitle>@(_gallery?.Name ?? "Gallery")</PageTitle>
+<PageTitle>@(_galleryName ?? "Gallery")</PageTitle>
 
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/">Galleries</a></li>
-        <li class="breadcrumb-item active" aria-current="page">@(_gallery?.Name ?? $"Gallery {Id}")</li>
+        <li class="breadcrumb-item active" aria-current="page">@(_galleryName ?? $"Gallery {Id}")</li>
     </ol>
 </nav>
 
-@if (_gallery is null)
+@if (_galleryName is null)
 {
     <h1 class="mb-2 placeholder-glow"><span class="placeholder col-4"></span></h1>
     <p class="text-muted placeholder-glow"><span class="placeholder col-2"></span></p>
@@ -27,27 +27,15 @@
 }
 else
 {
-    <div class="d-flex align-items-baseline justify-content-between mb-3 flex-wrap gap-2">
-        <div>
-            <h1 class="mb-1">@_gallery.Name</h1>
-            @if (!string.IsNullOrWhiteSpace(_gallery.Description))
-            {
-                <p class="text-muted mb-0">@_gallery.Description</p>
-            }
-        </div>
-        <div class="d-flex align-items-center gap-2">
-            <label class="text-muted small text-nowrap" for="pageSize">Per page:</label>
-            <select id="pageSize" class="form-select form-select-sm" style="width: auto;"
-                    value="@_pageSize" @onchange="OnPageSizeChangedAsync">
-                @foreach (var size in PageSizeOptions)
-                {
-                    <option value="@size">@size</option>
-                }
-            </select>
-        </div>
+    <div class="mb-3">
+        <h1 class="mb-1">@_galleryName</h1>
+        @if (!string.IsNullOrWhiteSpace(_galleryDescription))
+        {
+            <p class="text-muted mb-0">@_galleryDescription</p>
+        }
     </div>
 
-    @if (_gallery.Items.Count == 0)
+    @if (_items.Count == 0 && !_hasMore)
     {
         <div class="text-center py-5">
             <h4 class="text-muted">No media in this gallery</h4>
@@ -56,10 +44,10 @@ else
     else
     {
         <div class="gallery-grid">
-            @for (var i = 0; i < _gallery.Items.Count; i++)
+            @for (var i = 0; i < _items.Count; i++)
             {
                 var index = i;
-                var item = _gallery.Items[i];
+                var item = _items[i];
                 <div class="gallery-grid-item" @onclick="() => OpenFullscreen(index)">
                     @if (item.Type == "Video")
                     {
@@ -76,35 +64,28 @@ else
             }
         </div>
 
-        @if (TotalPages > 1)
+        @if (_hasMore)
         {
-            <nav aria-label="Gallery pagination" class="mt-4 d-flex justify-content-center">
-                <ul class="pagination">
-                    <li class="page-item @(_page <= 1 ? "disabled" : "")">
-                        <button class="page-link" @onclick="() => GoToPageAsync(_page - 1)" disabled="@(_page <= 1)">&laquo;</button>
-                    </li>
-                    @foreach (var p in VisiblePages)
+            <div class="d-flex justify-content-center py-4">
+                <button class="btn btn-outline-secondary" @onclick="LoadNextBatchAsync" disabled="@_isLoading">
+                    @if (_isLoading)
                     {
-                        <li class="page-item @(p == _page ? "active" : "")">
-                            <button class="page-link" @onclick="() => GoToPageAsync(p)">@p</button>
-                        </li>
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                     }
-                    <li class="page-item @(_page >= TotalPages ? "disabled" : "")">
-                        <button class="page-link" @onclick="() => GoToPageAsync(_page + 1)" disabled="@(_page >= TotalPages)">&raquo;</button>
-                    </li>
-                </ul>
-            </nav>
+                    Load more
+                </button>
+            </div>
         }
 
         <p class="text-center text-muted small mt-2">
-            Showing @((_page - 1) * _pageSize + 1)–@Math.Min(_page * _pageSize, _gallery.TotalCount) of @_gallery.TotalCount
+            @_items.Count of @_totalCount
         </p>
     }
 }
 
-@if (_fullscreenIndex is not null && _gallery is not null)
+@if (_fullscreenIndex is not null && _items.Count > 0)
 {
-    <div class="lightbox-overlay" @onclick="CloseFullscreen" @onkeydown="OnKeyDown" tabindex="0" @ref="_lightboxRef">
+    <div class="lightbox-overlay" @onclick="CloseFullscreen" @onkeydown="OnKeyDownAsync" tabindex="0" @ref="_lightboxRef">
         <button class="lightbox-close" @onclick="CloseFullscreen" aria-label="Close">&times;</button>
 
         <div class="lightbox-nav lightbox-nav-left"
@@ -116,7 +97,7 @@ else
 
         <div class="lightbox-content" @onclick:stopPropagation="true">
             @{
-                var current = _gallery.Items[_fullscreenIndex.Value];
+                var current = _items[_fullscreenIndex.Value];
             }
             @if (current.Type == "Video")
             {
@@ -133,85 +114,71 @@ else
         </div>
 
         <div class="lightbox-nav lightbox-nav-right"
-             @onclick="NextMedia" @onclick:stopPropagation="true">
+             @onclick="NextMediaAsync" @onclick:stopPropagation="true">
             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" viewBox="0 0 16 16">
                 <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
             </svg>
         </div>
 
         <div class="lightbox-counter" @onclick:stopPropagation="true">
-            @(_fullscreenIndex.Value + 1) / @_gallery.Items.Count
+            @(_fullscreenIndex.Value + 1) / @_totalCount
         </div>
     </div>
 }
 
 @code {
-    private static readonly int[] PageSizeOptions = [12, 24, 48, 96];
+    private const int BatchSize = 48;
 
     [Parameter]
     public long Id { get; set; }
 
-    private GalleryDetailResponse? _gallery;
-    private int _page = 1;
-    private int _pageSize = 24;
+    private string? _galleryName;
+    private string? _galleryDescription;
+    private int _totalCount;
+    private readonly List<GalleryMediaItem> _items = [];
+    private int _nextPage = 1;
+    private bool _isLoading;
+    private bool _hasMore = true;
     private int? _fullscreenIndex;
     private ElementReference _lightboxRef;
 
-    private int TotalPages => _gallery is null or { TotalCount: 0 }
-        ? 1
-        : (int)Math.Ceiling((double)_gallery.TotalCount / _pageSize);
-
-    private IEnumerable<int> VisiblePages
-    {
-        get
-        {
-            const int maxVisible = 7;
-            var total = TotalPages;
-            if (total <= maxVisible)
-            {
-                return Enumerable.Range(1, total);
-            }
-
-            var start = Math.Max(1, _page - maxVisible / 2);
-            var end = start + maxVisible - 1;
-            if (end > total)
-            {
-                end = total;
-                start = end - maxVisible + 1;
-            }
-
-            return Enumerable.Range(start, end - start + 1);
-        }
-    }
-
     protected override async Task OnInitializedAsync()
     {
-        await LoadGalleryAsync();
+        await LoadNextBatchAsync();
     }
 
-    private async Task LoadGalleryAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        _gallery = await Http.GetFromJsonAsync<GalleryDetailResponse>(
-            $"/api/galleries/{Id}?page={_page}&pageSize={_pageSize}");
-    }
 
-    private async Task GoToPageAsync(int page)
-    {
-        if (page < 1 || page > TotalPages || page == _page) return;
-        _page = page;
-        _gallery = null;
-        await LoadGalleryAsync();
-    }
-
-    private async Task OnPageSizeChangedAsync(ChangeEventArgs e)
-    {
-        if (int.TryParse(e.Value?.ToString(), out var newSize) && newSize != _pageSize)
+        if (_fullscreenIndex is not null)
         {
-            _pageSize = newSize;
-            _page = 1;
-            _gallery = null;
-            await LoadGalleryAsync();
+            await _lightboxRef.FocusAsync();
         }
+    }
+
+    private async Task LoadNextBatchAsync()
+    {
+        if (_isLoading || !_hasMore) return;
+        _isLoading = true;
+
+        var response = await Http.GetFromJsonAsync<GalleryDetailResponse>(
+            $"/api/galleries/{Id}?page={_nextPage}&pageSize={BatchSize}");
+
+        if (response is not null)
+        {
+            if (_galleryName is null)
+            {
+                _galleryName = response.Name;
+                _galleryDescription = response.Description;
+            }
+
+            _totalCount = response.TotalCount;
+            _items.AddRange(response.Items);
+            _hasMore = _items.Count < _totalCount;
+            _nextPage++;
+        }
+
+        _isLoading = false;
     }
 
     private void OpenFullscreen(int index)
@@ -232,15 +199,31 @@ else
         }
     }
 
-    private void NextMedia()
+    private async Task NextMediaAsync()
     {
-        if (_gallery is not null && _fullscreenIndex < _gallery.Items.Count - 1)
+        if (_fullscreenIndex is null) return;
+
+        if (_fullscreenIndex < _items.Count - 1)
         {
             _fullscreenIndex++;
         }
+        else if (_hasMore)
+        {
+            await LoadNextBatchAsync();
+            if (_fullscreenIndex < _items.Count - 1)
+            {
+                _fullscreenIndex++;
+            }
+        }
+
+        // Pre-fetch when approaching the end of loaded items
+        if (_hasMore && _fullscreenIndex >= _items.Count - 5)
+        {
+            await LoadNextBatchAsync();
+        }
     }
 
-    private void OnKeyDown(KeyboardEventArgs e)
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
     {
         switch (e.Key)
         {
@@ -251,16 +234,9 @@ else
                 PreviousMedia();
                 break;
             case "ArrowRight":
-                NextMedia();
+                await NextMediaAsync();
                 break;
         }
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (_fullscreenIndex is not null)
-        {
-            await _lightboxRef.FocusAsync();
-        }
-    }
 }
