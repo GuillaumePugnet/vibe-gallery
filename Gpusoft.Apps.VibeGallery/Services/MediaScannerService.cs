@@ -215,6 +215,7 @@ public sealed class MediaScannerService : IMediaScanner
                 contentType: contentType,
                 fileSize: fileInfo.Length,
                 type: mediaType,
+                createdAt: fileInfo.CreationTimeUtc,
                 galleryId: gallery.Id);
 
             db.Media.Add(media);

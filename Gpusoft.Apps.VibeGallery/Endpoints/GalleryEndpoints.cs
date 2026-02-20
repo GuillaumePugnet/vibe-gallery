@@ -76,10 +76,10 @@ public static class GalleryEndpoints
         var items = await db.Media
             .AsNoTracking()
             .Where(m => m.GalleryId == id)
-            .OrderBy(m => m.Path)
+            .OrderByDescending(m => m.CreatedAt)
             .Skip((effectivePage - 1) * effectivePageSize)
             .Take(effectivePageSize)
-            .Select(m => new GalleryMediaItem(m.Id, m.Type.ToString(), m.ContentType))
+            .Select(m => new GalleryMediaItem(m.Id, m.Type.ToString(), m.ContentType, m.CreatedAt))
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
@@ -149,4 +149,5 @@ public record GalleryDetailResponse(
 public record GalleryMediaItem(
     long Id,
     string Type,
-    string ContentType);
+    string ContentType,
+    DateTime CreatedAt);
