@@ -3,8 +3,9 @@
 # This stage is used when running from VS in fast mode (Default for Debug configuration)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS base
 RUN apk add --no-cache ffmpeg
-USER $APP_UID
+RUN mkdir -p /app/appData && chown $APP_UID:$APP_UID /app/appData
 WORKDIR /app
+USER $APP_UID
 EXPOSE 8080
 EXPOSE 8081
 
